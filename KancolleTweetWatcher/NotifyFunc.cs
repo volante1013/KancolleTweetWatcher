@@ -21,7 +21,7 @@ namespace KancolleTweetWatcher
 		private static readonly string PBAccessToken = Environment.GetEnvironmentVariable("PushBulletAccessToken", EnvironmentVariableTarget.Process);
 
 		[FunctionName("NotifyFunc")]
-		public static void/*async Task<object>*/ Run ([TimerTrigger("0 0 12 23 4 *")]TimerInfo myTimer, TraceWriter log
+		public static void/*async Task<object>*/ Run ([TimerTrigger("0 0 7 23 4 *")]TimerInfo myTimer, TraceWriter log
 			//[HttpTrigger(AuthorizationLevel.Admin, Route = null, WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log
 			)
         {
@@ -36,7 +36,6 @@ namespace KancolleTweetWatcher
 			var info = client.CurrentUsersInformation();
 			if(info == null)
 			{
-				//return req.CreateErrorResponse(HttpStatusCode.BadRequest, "[Error] PushBullet CurrentUsersInfomation is null!");
 				log.Error("[Error] PushBullet CurrentUsersInfomation is null!");
 				return;
 			}
