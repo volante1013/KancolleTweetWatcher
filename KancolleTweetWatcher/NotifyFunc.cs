@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Configuration;
 using System.IO;
 using System.Net;
@@ -43,9 +43,9 @@ namespace KancolleTweetWatcher
 			var request = new PushLinkRequest()
 			{
 				Email = info.Email,
-				Title = $"[{DateTime.Now}]\ni—ßŠ¯! ƒƒ“ƒeƒiƒ“ƒX“ú‚É‚Â‚¢‚Ä‚Ì•ñ‚Å‚·!",
+				Title = $"[{DateTime.Now}]\nå¸ä»¤å®˜! ãƒ¡ãƒ³ãƒ†ãƒŠãƒ³ã‚¹æ—¥æ™‚ã«ã¤ã„ã¦ã®å ±å‘Šã§ã™!",
 				Url = data.Url,
-				Body = $"{data.Day}({data.Time})‚É\nŠÍ‚±‚ê‚Ìƒƒ“ƒeƒiƒ“ƒX‚ªs‚í‚ê‚Ü‚·!\n‚²’ˆÓ‚­‚¾‚³‚¢!\n(ˆÈ‰ºA‘å–{‰c”­•\)\n"
+				Body = $"{data.Day}({data.Time})ã«\nè‰¦ã“ã‚Œã®ãƒ¡ãƒ³ãƒ†ãƒŠãƒ³ã‚¹ãŒè¡Œã‚ã‚Œã¾ã™!\nã”æ³¨æ„ãã ã•ã„!\n(ä»¥ä¸‹ã€å¤§æœ¬å–¶ç™ºè¡¨)\n"
 			};
 
 			ai.TrackTrace(client.PushLink(request).ToJson(), Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose);

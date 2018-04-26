@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
@@ -35,7 +35,7 @@ namespace KancolleTweetWatcher
 		private const string testTimer = "0 53 * * * *";
 
 
-		[FunctionName("TweetMonitor")] // –ˆTŒŽ—j“ú‚Ì7:00‚É‹N“®
+		[FunctionName("TweetMonitor")] // æ¯Žé€±æœˆæ›œæ—¥ã®7:00ã«èµ·å‹•
 		public static async Task Run ([TimerTrigger(productionTimer)]TimerInfo myTimer, TraceWriter log)
 		{
 			log.Info($"[{DateTime.Now}] : C# TweetMonitor function processed a request.");
@@ -66,7 +66,7 @@ namespace KancolleTweetWatcher
 				["screen_name"] = ScreenName,
 			};
 
-			var maintenanceTweets = await apponly.Statuses.UserTimelineAsync(param).ContinueWith(tl => tl.Result.Where(t => t.Text.Contains("ƒƒ“ƒe")));
+			var maintenanceTweets = await apponly.Statuses.UserTimelineAsync(param).ContinueWith(tl => tl.Result.Where(t => t.Text.Contains("ãƒ¡ãƒ³ãƒ†")));
 			foreach(var tweet in maintenanceTweets)
 			{
 				var Days = Regex.Matches(tweet.Text, regexDays).Cast<Match>().Select(match => match.Value);
