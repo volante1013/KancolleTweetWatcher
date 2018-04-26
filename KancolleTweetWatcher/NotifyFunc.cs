@@ -49,7 +49,6 @@ namespace KancolleTweetWatcher
 			};
 
 			ai.TrackTrace(client.PushLink(request).ToJson(), Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose);
-			//log.Info(client.PushLink(request).ToJson());
 			//return req.CreateResponse(HttpStatusCode.OK, client.PushLink(request));
 		}
 	}
