@@ -8,7 +8,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using CoreTweet;
-using Microsoft.ApplicationInsights;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
@@ -17,41 +16,45 @@ namespace KancolleTweetWatcher
 {
 	public static class TweetMonitor
 	{
-		private static readonly string consumerKey = Environment.GetEnvironmentVariable("TwitterConsumerKey");
-		private static readonly string consumerSecret = Environment.GetEnvironmentVariable("TwitterConsumerSecret");
+		private static readonly string consumerKey = ConfigurationManager.AppSettings.Get("TwitterConsumerKey");
+		private static readonly string consumerSecret = ConfigurationManager.AppSettings.Get("TwitterConsumerSecret");
 		private static OAuth2Token apponly = OAuth2.GetToken(consumerKey, consumerSecret);
 		private static readonly string ScreenName = "KanColle_STAFF";
 
-		private static readonly string username = Environment.GetEnvironmentVariable("DEPLOYUSERNAME");
-		private static readonly string password = Environment.GetEnvironmentVariable("DEPLOYPASSWORD");
+		private static readonly string username = ConfigurationManager.AppSettings.Get("DEPLOYUSERNAME");
+		private static readonly string password = ConfigurationManager.AppSettings.Get("DEPLOYPASSWORD");
 
 		private static readonly string regexDays = @"[0-9]+\/[0-9]+(\(.\))*";
 		private static readonly string regexTimes = @"[0-9]+\:[0-9]+";
 
 		private static HttpClient client = new HttpClient();
-		private static TelemetryClient ai = new TelemetryClient();
+		private static TraceWriter log;
 
-		private const string productionTimer = "0 0 7 * * 1";
-		private const string testTimer = "0 53 * * * *";
+#if DEBUG
+		private const string scheduleExpression = "30 0 0 * * *";
+#else
+		// 毎週月曜日の7:00に起動
+		private const string scheduleExpression = "0 0 7 * * 1";
+#endif
 
-
-		[FunctionName("TweetMonitor")] // 毎週月曜日の7:00に起動
-		public static async Task Run ([TimerTrigger(productionTimer)]TimerInfo myTimer, TraceWriter log)
+		[FunctionName("TweetMonitor")]
+		public static async Task Run ([TimerTrigger(scheduleExpression)]TimerInfo myTimer, TraceWriter writer)
 		{
+			log = writer;
 			log.Info($"[{DateTime.Now}] : C# TweetMonitor function processed a request.");
 
-			client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}")));
-			client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "*");
+			SetRequestHeaders();
 
 			var count = await apponly.Users.ShowAsync(ScreenName).ContinueWith(s => s.Result.StatusesCount);
 
 			var twiUserData = await GetData();
+			twiUserData.tweetDatas.Clear();
 
 			var lastStatusesCount = twiUserData?.LastStatusesCount ?? 0;
 
 			twiUserData.LastStatusesCount = count;
 
-			ai.TrackTrace($"OldStatuesCount={lastStatusesCount}, NowCount={count}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information);
+			log.Info($"OldStatuesCount={lastStatusesCount}, NowCount={count}");
 
 			var diffCount = Math.Min(Math.Max(0, count - lastStatusesCount), 50);
 			if(diffCount == 0)
@@ -60,38 +63,46 @@ namespace KancolleTweetWatcher
 				return;
 			}
 
-			var param = new Dictionary<string, object>()
-			{
-				["count"] = diffCount,
-				["screen_name"] = ScreenName,
-			};
-
+			var param = new Dictionary<string, object>() { ["count"] = diffCount, ["screen_name"] = ScreenName };
 			var maintenanceTweets = await apponly.Statuses.UserTimelineAsync(param).ContinueWith(tl => tl.Result.Where(t => t.Text.Contains("メンテ")));
-			foreach(var tweet in maintenanceTweets)
+			if (maintenanceTweets.Any())
 			{
-				var Days = Regex.Matches(tweet.Text, regexDays).Cast<Match>().Select(match => match.Value);
-
-				if (!Days.Any())
-					continue;
-
-				var Times = Regex.Matches(tweet.Text, regexTimes).Cast<Match>().Select(match => match.Value);
-				var timeStr = string.Join("-", Times);
-
-				var url = tweet.Entities.Urls.FirstOrDefault()?.Url ?? "";
-
-				var tweetData = new TweetData(Days.FirstOrDefault(), timeStr, url, tweet.Text);
-				twiUserData.tweetDatas.Add(tweetData);
-
-				PutData(twiUserData);
-
-				if (!tweetData.IsAnyEmpty())
+				foreach (var tweet in maintenanceTweets)
 				{
-					NotifyFunc.Run(null, log);
+					var Days = Regex.Matches(tweet.Text, regexDays).Cast<Match>().Select(match => match.Value);
+
+					if (!Days.Any())
+						continue;
+
+					var Times = Regex.Matches(tweet.Text, regexTimes).Cast<Match>().Select(match => match.Value);
+					var timeStr = string.Join("-", Times);
+
+					var url = tweet.Entities.Urls.FirstOrDefault()?.Url ?? "";
+
+					var tweetData = new TweetData(Days.FirstOrDefault(), timeStr, url, tweet.Text);
+					twiUserData.tweetDatas.Add(tweetData);
+
+					if (!tweetData.IsAnyEmpty())
+					{
+						await NotifyFunc.NotifyPushBullet(twiUserData);
+					}
 				}
 			}
+			else
+			{
+				log.Info("Nothing tweets what the text contains \"メンテ\". ");
+			}
+
+			PutData(twiUserData);
 		}
 
-		private static async Task<TwiUserData> GetData ()
+		public static void SetRequestHeaders ()
+		{
+			client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}")));
+			client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "*");
+		}
+
+		public static async Task<TwiUserData> GetData ()
 		{
 			var response = await client.GetAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", HttpCompletionOption.ResponseContentRead);
 
@@ -102,7 +113,7 @@ namespace KancolleTweetWatcher
 		private static async void PutData (TwiUserData twiUserData)
 		{
 			var response = await client.PutAsJsonAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", twiUserData);
-			ai.TrackTrace(response.ToString(), Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information);
+			log.Info(response.ToString());
 		}
 	}
 }

@@ -1,16 +1,10 @@
 ﻿using System;
 using System.Configuration;
-using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Text;
+using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.ApplicationInsights;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.Azure.WebJobs.Host;
 
-using Newtonsoft.Json;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
 using PushbulletSharp;
 using PushbulletSharp.Models.Requests;
 
@@ -18,23 +12,35 @@ namespace KancolleTweetWatcher
 {
 	public static class NotifyFunc
     {
-		private static readonly string PBAccessToken = Environment.GetEnvironmentVariable("PushBulletAccessToken", EnvironmentVariableTarget.Process);
+		private static readonly string PBAccessToken = ConfigurationManager.AppSettings.Get("PushBulletAccessToken");
+		private static readonly PushbulletClient client = new PushbulletClient(PBAccessToken);
+
+		private static TraceWriter log;
+
+#if DEBUG
+		private const string scheduleExpression = "30 * * * * *";
+#else
+		private const string scheduleExpression = "0 0 7 23 4 *";
+#endif
 
 		[FunctionName("NotifyFunc")]
-		public static void/*async Task<object>*/ Run ([TimerTrigger("0 0 7 23 4 *")]TimerInfo myTimer, TraceWriter log
-			//[HttpTrigger(AuthorizationLevel.Admin, Route = null, WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log
-			)
+		public static void Run ([TimerTrigger(scheduleExpression)]TimerInfo myTimer, TraceWriter writer)
         {
-			var ai = new TelemetryClient();
+			log = writer;
             log.Info($"[{DateTime.Now}] : C# NotifyFunc function processed a request.");
 
-			string jsonContent = ConfigurationManager.AppSettings.Get("tweetdata");
-			var data = JsonConvert.DeserializeObject<TweetData>(jsonContent) ?? new TweetData();
-			ai.TrackTrace(jsonContent, Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information);
+			Task.Run(() => NotifyPushBullet());
+		}
 
-			var client = new PushbulletClient(PBAccessToken);
+		public static async Task NotifyPushBullet (TwiUserData userData = null)
+		{
+			TweetMonitor.SetRequestHeaders();
+			var twiUserData = (userData == null) ?  await TweetMonitor.GetData() : userData;
+			var data = twiUserData.tweetDatas.FirstOrDefault(tweet => !tweet.IsAnyEmpty()) ?? new TweetData();
+			log.Info(data.ToString());
+
 			var info = client.CurrentUsersInformation();
-			if(info == null)
+			if (info == null)
 			{
 				log.Error("[Error] PushBullet CurrentUsersInfomation is null!");
 				return;
@@ -48,7 +54,7 @@ namespace KancolleTweetWatcher
 				Body = $"{data.Day}({data.Time})に\n艦これのメンテナンスが行われます!\nご注意ください!\n(以下、大本営発表)\n"
 			};
 
-			ai.TrackTrace(client.PushLink(request).ToJson(), Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose);
+			log.Info(client.PushLink(request).ToJson());
 		}
 	}
 }
