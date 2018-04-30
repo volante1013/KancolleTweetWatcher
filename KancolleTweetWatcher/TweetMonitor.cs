@@ -31,12 +31,14 @@ namespace KancolleTweetWatcher
 		private static HttpClient client = new HttpClient();
 		private static TelemetryClient ai = new TelemetryClient();
 
-		private const string productionTimer = "0 0 7 * * 1";
-		private const string testTimer = "0 53 * * * *";
-
+#if DEBUG
+		private const string scheduleExpression = "0 53 * * * *";
+#else
+		private const string scheduleExpression = "0 0 7 * * 1";
+#endif
 
 		[FunctionName("TweetMonitor")] // 毎週月曜日の7:00に起動
-		public static async Task Run ([TimerTrigger(productionTimer)]TimerInfo myTimer, TraceWriter log)
+		public static async Task Run ([TimerTrigger(scheduleExpression)]TimerInfo myTimer, TraceWriter log)
 		{
 			log.Info($"[{DateTime.Now}] : C# TweetMonitor function processed a request.");
 
