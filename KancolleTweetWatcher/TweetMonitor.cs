@@ -17,13 +17,13 @@ namespace KancolleTweetWatcher
 {
 	public static class TweetMonitor
 	{
-		private static readonly string consumerKey = Environment.GetEnvironmentVariable("TwitterConsumerKey");
-		private static readonly string consumerSecret = Environment.GetEnvironmentVariable("TwitterConsumerSecret");
+		private static readonly string consumerKey = ConfigurationManager.AppSettings.Get("TwitterConsumerKey");
+		private static readonly string consumerSecret = ConfigurationManager.AppSettings.Get("TwitterConsumerSecret");
 		private static OAuth2Token apponly = OAuth2.GetToken(consumerKey, consumerSecret);
 		private static readonly string ScreenName = "KanColle_STAFF";
 
-		private static readonly string username = Environment.GetEnvironmentVariable("DEPLOYUSERNAME");
-		private static readonly string password = Environment.GetEnvironmentVariable("DEPLOYPASSWORD");
+		private static readonly string username = ConfigurationManager.AppSettings.Get("DEPLOYUSERNAME");
+		private static readonly string password = ConfigurationManager.AppSettings.Get("DEPLOYPASSWORD");
 
 		private static readonly string regexDays = @"[0-9]+\/[0-9]+(\(.\))*";
 		private static readonly string regexTimes = @"[0-9]+\:[0-9]+";
@@ -32,7 +32,7 @@ namespace KancolleTweetWatcher
 		private static TelemetryClient ai = new TelemetryClient();
 
 #if DEBUG
-		private const string scheduleExpression = "0 53 * * * *";
+		private const string scheduleExpression = "30 * * * * *";
 #else
 		private const string scheduleExpression = "0 0 7 * * 1";
 #endif

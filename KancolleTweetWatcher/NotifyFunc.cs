@@ -18,12 +18,16 @@ namespace KancolleTweetWatcher
 {
 	public static class NotifyFunc
     {
-		private static readonly string PBAccessToken = Environment.GetEnvironmentVariable("PushBulletAccessToken", EnvironmentVariableTarget.Process);
+		private static readonly string PBAccessToken = ConfigurationManager.AppSettings.Get("PushBulletAccessToken");
+
+#if DEBUG
+		private const string scheduleExpression = "0 * * * * *";
+#else
+		private const string scheduleExpression = "0 0 7 23 4 *";
+#endif
 
 		[FunctionName("NotifyFunc")]
-		public static void/*async Task<object>*/ Run ([TimerTrigger("0 0 7 23 4 *")]TimerInfo myTimer, TraceWriter log
-			//[HttpTrigger(AuthorizationLevel.Admin, Route = null, WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log
-			)
+		public static void Run ([TimerTrigger(scheduleExpression)]TimerInfo myTimer, TraceWriter log)
         {
 			var ai = new TelemetryClient();
             log.Info($"[{DateTime.Now}] : C# NotifyFunc function processed a request.");
