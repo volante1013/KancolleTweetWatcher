@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace KancolleTweetWatcher
 {
@@ -38,6 +35,17 @@ namespace KancolleTweetWatcher
 		public bool IsAnyEmpty ()
 		{
 			return this.Day == string.Empty || this.Time == string.Empty || this.Url == string.Empty;
+		}
+
+		public override string ToString ()
+		{
+			StringBuilder sb = new StringBuilder();
+			sb.AppendLine($"Day : {this.Day}");
+			sb.AppendLine($"Time : {this.Time}");
+			sb.AppendLine($"Url : {this.Url}");
+			sb.AppendLine($"Text : {this.Text}");
+
+			return sb.ToString();
 		}
 	}
 }
