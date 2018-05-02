@@ -33,7 +33,27 @@ namespace KancolleTweetWatcher
 		public static async Task<string> PutUserData (TwitterUserData twitterUserData)
 		{
 			var response = await client.PutAsJsonAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", twitterUserData);
-			return $"Put Status => {response.StatusCode}:{response.StatusCode.ToString()}";
+			return $"PutUserData Status => {response.StatusCode}:{response.StatusCode.ToString()}";
+		}
+
+		public static async Task<FunctionData> GetFunctionData ()
+		{
+			var response = await client.GetAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/NotifyFunc/function.json");
+			var str = await response.Content.ReadAsStringAsync();
+			return JsonConvert.DeserializeObject<FunctionData>(str) ?? new FunctionData();
+		}
+
+		public static async Task<string> PutFunctionData (FunctionData functionData)
+		{
+			var funcJson = JsonConvert.SerializeObject(functionData);
+			var response = await client.PutAsJsonAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/NotifyFunc/function.json", funcJson);
+			return $"PutFuncData Status => {response.StatusCode}:{response.StatusCode.ToString()}";
+		}
+
+		public static async Task<string> SyncTrigger ()
+		{
+			var response = await client.PostAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/functions/synctriggers", null);
+			return $"Sync Status => {response.StatusCode}:{response.StatusCode.ToString()}";
 		}
 	}
 }
