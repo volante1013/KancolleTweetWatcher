@@ -3,12 +3,12 @@ using System.Text;
 
 namespace KancolleTweetWatcher
 {
-	public class TwiUserData
+	public class TwitterUserData
 	{
 		public int LastStatusesCount;
 		public List<TweetData> tweetDatas;
 
-		public TwiUserData ()
+		public TwitterUserData ()
 		{
 			LastStatusesCount = 0;
 			tweetDatas = new List<TweetData>();

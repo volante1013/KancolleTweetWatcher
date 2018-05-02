@@ -32,10 +32,10 @@ namespace KancolleTweetWatcher
 			Task.Run(() => NotifyPushBullet());
 		}
 
-		public static async Task NotifyPushBullet (TwiUserData userData = null)
+		public static async Task NotifyPushBullet (TwitterUserData userData = null)
 		{
-			TweetMonitor.SetRequestHeaders();
-			var twiUserData = (userData == null) ?  await TweetMonitor.GetData() : userData;
+			AzureHttpRequester.SetRequestHeaders();
+			var twiUserData = (userData == null) ?  await AzureHttpRequester.GetUserData() : userData;
 			var data = twiUserData.tweetDatas.FirstOrDefault(tweet => !tweet.IsAnyEmpty()) ?? new TweetData();
 			log.Info(data.ToString());
 
@@ -54,7 +54,7 @@ namespace KancolleTweetWatcher
 				Body = $"{data.Day}({data.Time})に\n艦これのメンテナンスが行われます!\nご注意ください!\n(以下、大本営発表)\n"
 			};
 
-			log.Info(client.PushLink(request).ToJson());
+			log.Info($"PushLink Response:\n{client.PushLink(request).ToJson()}");
 		}
 	}
 }

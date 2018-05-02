@@ -21,13 +21,9 @@ namespace KancolleTweetWatcher
 		private static OAuth2Token apponly = OAuth2.GetToken(consumerKey, consumerSecret);
 		private static readonly string ScreenName = "KanColle_STAFF";
 
-		private static readonly string username = ConfigurationManager.AppSettings.Get("DEPLOYUSERNAME");
-		private static readonly string password = ConfigurationManager.AppSettings.Get("DEPLOYPASSWORD");
-
 		private static readonly string regexDays = @"[0-9]+\/[0-9]+(\(.\))*";
 		private static readonly string regexTimes = @"[0-9]+\:[0-9]+";
 
-		private static HttpClient client = new HttpClient();
 		private static TraceWriter log;
 
 #if DEBUG
@@ -43,11 +39,11 @@ namespace KancolleTweetWatcher
 			log = writer;
 			log.Info($"[{DateTime.Now}] : C# TweetMonitor function processed a request.");
 
-			SetRequestHeaders();
+			AzureHttpRequester.SetRequestHeaders();
 
 			var count = await apponly.Users.ShowAsync(ScreenName).ContinueWith(s => s.Result.StatusesCount);
 
-			var twiUserData = await GetData();
+			var twiUserData = await AzureHttpRequester.GetUserData();
 			twiUserData.tweetDatas.Clear();
 
 			var lastStatusesCount = twiUserData?.LastStatusesCount ?? 0;
@@ -93,27 +89,7 @@ namespace KancolleTweetWatcher
 				log.Info("Nothing tweets what the text contains \"メンテ\". ");
 			}
 
-			PutData(twiUserData);
-		}
-
-		public static void SetRequestHeaders ()
-		{
-			client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}")));
-			client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "*");
-		}
-
-		public static async Task<TwiUserData> GetData ()
-		{
-			var response = await client.GetAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", HttpCompletionOption.ResponseContentRead);
-
-			var str =  await response.Content.ReadAsStringAsync();
-			return JsonConvert.DeserializeObject<TwiUserData>(str) ?? new TwiUserData();
-		}
-
-		private static async void PutData (TwiUserData twiUserData)
-		{
-			var response = await client.PutAsJsonAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", twiUserData);
-			log.Info(response.ToString());
+			log.Info(await AzureHttpRequester.PutUserData(twiUserData));
 		}
 	}
 }
