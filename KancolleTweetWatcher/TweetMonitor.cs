@@ -21,13 +21,9 @@ namespace KancolleTweetWatcher
 		private static OAuth2Token apponly = OAuth2.GetToken(consumerKey, consumerSecret);
 		private static readonly string ScreenName = "KanColle_STAFF";
 
-		private static readonly string username = ConfigurationManager.AppSettings.Get("DEPLOYUSERNAME");
-		private static readonly string password = ConfigurationManager.AppSettings.Get("DEPLOYPASSWORD");
-
 		private static readonly string regexDays = @"[0-9]+\/[0-9]+(\(.\))*";
 		private static readonly string regexTimes = @"[0-9]+\:[0-9]+";
 
-		private static HttpClient client = new HttpClient();
 		private static TraceWriter log;
 
 #if DEBUG
@@ -43,77 +39,117 @@ namespace KancolleTweetWatcher
 			log = writer;
 			log.Info($"[{DateTime.Now}] : C# TweetMonitor function processed a request.");
 
-			SetRequestHeaders();
+			// HttpClientのHeaderの設定
+			AzureHttpRequester.SetRequestHeaders();
 
+			// 艦これ公式のツイート数を取得
 			var count = await apponly.Users.ShowAsync(ScreenName).ContinueWith(s => s.Result.StatusesCount);
 
-			var twiUserData = await GetData();
+			// 前回起動時のユーザーデータを取得
+			var twiUserData = await AzureHttpRequester.GetUserData();
 			twiUserData.tweetDatas.Clear();
 
+			// 前回のツイート数を取得
 			var lastStatusesCount = twiUserData?.LastStatusesCount ?? 0;
 
-			twiUserData.LastStatusesCount = count;
-
-			log.Info($"OldStatuesCount={lastStatusesCount}, NowCount={count}");
-
+			// 前回からどれだけツイートしたかを算出、ツイートしていなければreturn
 			var diffCount = Math.Min(Math.Max(0, count - lastStatusesCount), 50);
 			if(diffCount == 0)
 			{
 				log.Info("Nothing New Tweet.");
 				return;
 			}
+			// ツイート数の更新
+			twiUserData.LastStatusesCount = count;
 
+			log.Info($"OldStatuesCount={lastStatusesCount}, NowCount={count}");
+
+			// メンテという文字が含まれたツイートがあるかどうかを前回からのツイート数分だけ検索・取得
 			var param = new Dictionary<string, object>() { ["count"] = diffCount, ["screen_name"] = ScreenName };
 			var maintenanceTweets = await apponly.Statuses.UserTimelineAsync(param).ContinueWith(tl => tl.Result.Where(t => t.Text.Contains("メンテ")));
 			if (maintenanceTweets.Any())
 			{
+				// メンテツイートが一つでもあれば
 				foreach (var tweet in maintenanceTweets)
 				{
+					// 正規表現で00/00となる部分を抽出
 					var Days = Regex.Matches(tweet.Text, regexDays).Cast<Match>().Select(match => match.Value);
 
-					if (!Days.Any())
-						continue;
+					// ツイートに日付が一つもなければスキップ
+					if (!Days.Any()) continue;
 
+					// 正規表現で00:00となる部分を抽出
 					var Times = Regex.Matches(tweet.Text, regexTimes).Cast<Match>().Select(match => match.Value);
+					// すべての時間をハイフンでつなぐ
+					// TODO: 時間が3つ以上あったときの処理
 					var timeStr = string.Join("-", Times);
 
+					// ツイートのURLの取得
+					// TODO: ツイートのURLが取得できないことがある原因の調査
 					var url = tweet.Entities.Urls.FirstOrDefault()?.Url ?? "";
 
+					// ツイートデータを作成して、ユーザーデータに追加
 					var tweetData = new TweetData(Days.FirstOrDefault(), timeStr, url, tweet.Text);
 					twiUserData.tweetDatas.Add(tweetData);
 
+					// ツイートに日付と時間,URLが含まれていたら
 					if (!tweetData.IsAnyEmpty())
 					{
+						// PushBulletで通知
 						await NotifyFunc.NotifyPushBullet(twiUserData);
+
+						// NotifyFuncのTimerTriggerを更新
+						UpdateNotifyTime(tweetData.GetCronStr());
 					}
 				}
 			}
 			else
 			{
+				// 一つもなければ
 				log.Info("Nothing tweets what the text contains \"メンテ\". ");
 			}
 
-			PutData(twiUserData);
+			// ユーザーデータの更新を反映
+			log.Info(await AzureHttpRequester.PutUserData(twiUserData));
 		}
 
-		public static void SetRequestHeaders ()
+		private static async void UpdateNotifyTime(string cronStr)
 		{
-			client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}")));
-			client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "*");
-		}
+			if(cronStr == string.Empty)
+			{
+				log.Info("cronStr is empty.");
+				return;
+			}
 
-		public static async Task<TwiUserData> GetData ()
-		{
-			var response = await client.GetAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", HttpCompletionOption.ResponseContentRead);
+			// NotifyFuncのfunction.jsonを取得
+			FunctionJson json = await AzureHttpRequester.GetFunctionJson();
+			if(json == null)
+			{
+				log.Info("json is null.");
+				return;
+			}
 
-			var str =  await response.Content.ReadAsStringAsync();
-			return JsonConvert.DeserializeObject<TwiUserData>(str) ?? new TwiUserData();
-		}
+			// function.jsonのtimer部分を取得
+			Binding binding = json.bindings.Where(bind => bind.name == "myTimer").FirstOrDefault();
+			if(binding.schedule == string.Empty)
+			{
+				log.Info("schedule is empty.");
+				return;
+			}
 
-		private static async void PutData (TwiUserData twiUserData)
-		{
-			var response = await client.PutAsJsonAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/tweetdata.json", twiUserData);
-			log.Info(response.ToString());
+			// function.jsonのtimer部分を更新。
+			if(binding.schedule == cronStr)
+			{
+				log.Info("cronStr is same");
+				return;
+			}
+			binding.schedule = cronStr;
+
+			// function.jsonをazureにput
+			log.Info(await AzureHttpRequester.PutFunctionJson(json));
+
+			// function.jsonをsync
+			log.Info(await AzureHttpRequester.SyncTrigger());
 		}
 	}
 }

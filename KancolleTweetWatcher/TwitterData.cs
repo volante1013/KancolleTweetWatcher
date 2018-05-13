@@ -3,12 +3,12 @@ using System.Text;
 
 namespace KancolleTweetWatcher
 {
-	public class TwiUserData
+	public class TwitterUserData
 	{
 		public int LastStatusesCount;
 		public List<TweetData> tweetDatas;
 
-		public TwiUserData ()
+		public TwitterUserData ()
 		{
 			LastStatusesCount = 0;
 			tweetDatas = new List<TweetData>();
@@ -46,6 +46,21 @@ namespace KancolleTweetWatcher
 			sb.AppendLine($"Text : {this.Text}");
 
 			return sb.ToString();
+		}
+
+		public string GetCronStr()
+		{
+			if (!IsAnyEmpty()) return string.Empty;
+
+			string cronStr = "";
+			string[] date = Day.Split('/');
+
+			// TODO: 今は午前7時固定だが必要になったらどの時間でも指定できるようにする
+			cronStr += "0 0 7 ";
+			cronStr += date[1] + " " + date[0];
+			cronStr += " *";
+
+			return cronStr;
 		}
 	}
 }
