@@ -18,7 +18,7 @@ namespace KancolleTweetWatcher
 		private static TraceWriter log;
 
 #if DEBUG
-		private const string scheduleExpression = "30 * * * * *";
+		private const string scheduleExpression = "30 0 0 * * *";
 #else
 		private const string scheduleExpression = "0 0 7 23 4 *";
 #endif
@@ -39,6 +39,7 @@ namespace KancolleTweetWatcher
 			var data = twiUserData.tweetDatas.FirstOrDefault(tweet => !tweet.IsAnyEmpty()) ?? new TweetData();
 			log.Info(data.ToString());
 
+			// PushBulletのクライアントの情報を取得
 			var info = client.CurrentUsersInformation();
 			if (info == null)
 			{
@@ -46,6 +47,7 @@ namespace KancolleTweetWatcher
 				return;
 			}
 
+			// リンクを付与したリクエストの作成
 			var request = new PushLinkRequest()
 			{
 				Email = info.Email,
@@ -54,6 +56,7 @@ namespace KancolleTweetWatcher
 				Body = $"{data.Day}({data.Time})に\n艦これのメンテナンスが行われます!\nご注意ください!\n(以下、大本営発表)\n"
 			};
 
+			// リクエストのPushを実行
 			log.Info($"PushLink Response:\n{client.PushLink(request).ToJson()}");
 		}
 	}
