@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace KancolleTweetWatcher
 {
-    public class FunctionData
+    public class FunctionJson
     {
 		public string generatedBy { get; set; }
 		public string configurationSource { get; set; }

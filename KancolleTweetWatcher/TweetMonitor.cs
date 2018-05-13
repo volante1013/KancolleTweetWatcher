@@ -97,6 +97,9 @@ namespace KancolleTweetWatcher
 					{
 						// PushBulletで通知
 						await NotifyFunc.NotifyPushBullet(twiUserData);
+
+						// NotifyFuncのTimerTriggerを更新
+						UpdateNotifyTime(tweetData.GetCronStr());
 					}
 				}
 			}
@@ -108,6 +111,45 @@ namespace KancolleTweetWatcher
 
 			// ユーザーデータの更新を反映
 			log.Info(await AzureHttpRequester.PutUserData(twiUserData));
+		}
+
+		private static async void UpdateNotifyTime(string cronStr)
+		{
+			if(cronStr == string.Empty)
+			{
+				log.Info("cronStr is empty.");
+				return;
+			}
+
+			// NotifyFuncのfunction.jsonを取得
+			FunctionJson json = await AzureHttpRequester.GetFunctionJson();
+			if(json == null)
+			{
+				log.Info("json is null.");
+				return;
+			}
+
+			// function.jsonのtimer部分を取得
+			Binding binding = json.bindings.Where(bind => bind.name == "myTimer").FirstOrDefault();
+			if(binding.schedule == string.Empty)
+			{
+				log.Info("schedule is empty.");
+				return;
+			}
+
+			// function.jsonのtimer部分を更新。
+			if(binding.schedule == cronStr)
+			{
+				log.Info("cronStr is same");
+				return;
+			}
+			binding.schedule = cronStr;
+
+			// function.jsonをazureにput
+			log.Info(await AzureHttpRequester.PutFunctionJson(json));
+
+			// function.jsonをsync
+			log.Info(await AzureHttpRequester.SyncTrigger());
 		}
 	}
 }

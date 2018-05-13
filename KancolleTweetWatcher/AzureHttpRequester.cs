@@ -36,16 +36,16 @@ namespace KancolleTweetWatcher
 			return $"PutUserData Status => {response.StatusCode}:{response.StatusCode.ToString()}";
 		}
 
-		public static async Task<FunctionData> GetFunctionData ()
+		public static async Task<FunctionJson> GetFunctionJson ()
 		{
 			var response = await client.GetAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/NotifyFunc/function.json");
 			var str = await response.Content.ReadAsStringAsync();
-			return JsonConvert.DeserializeObject<FunctionData>(str) ?? new FunctionData();
+			return JsonConvert.DeserializeObject<FunctionJson>(str);
 		}
 
-		public static async Task<string> PutFunctionData (FunctionData functionData)
+		public static async Task<string> PutFunctionJson (FunctionJson functionJson)
 		{
-			var funcJson = JsonConvert.SerializeObject(functionData);
+			var funcJson = JsonConvert.SerializeObject(functionJson);
 			var response = await client.PutAsJsonAsync("https://kancolletweetwatcher.scm.azurewebsites.net/api/vfs/site/wwwroot/NotifyFunc/function.json", funcJson);
 			return $"PutFuncData Status => {response.StatusCode}:{response.StatusCode.ToString()}";
 		}
